@@ -85,63 +85,72 @@ El sistema envía un paquete consolidado cada 5 segundos para optimizar el ancho
 }
 
 
-🔧 Configuración de Hardware (Pinout Sugerido)
+🔧 Configuración de Hardware (Pinout Utilizado)
 
-Periférico
 
-Pin ESP32-S3
+| **SPI3 MOSI** | GPIO 1      | Datos Master Out MAX31865(SPI3) |
+| **SPI3 MISO** | GPIO 2      | Datos Master In    (SPI3)       |
+| **SPI3 SCK**  | GPIO 3      | Reloj de Bus       (SPI3)       |
+| **CS RTD**    | GPIO 5      | Selección MAX31865 (SPI3)       |
+| **CS TC**     | GPIO 4      | Selección MAX6675  (SPI3)       |
+| **SPI2 MOSI** | GPIO 11     | Datos Master Out   (SPI2)       |
+| **SPI2 MISO** | GPIO 13     | Datos Master In    (SPI2)       |
+| **SPI2 SCK**  | GPIO 12     | Reloj de Bus       (SPI2)       |
+| **CS ETH**    | GPIO 10     | Selección ENC28J60 (SPI2)       |
+| **INT ETH **  | GPIO 46     | GPIO pin INT ENC28J60           |
+| **RST ETH **  | GPIO 9      | GPIO pin RST ENC28J60           |
+| **ZCD MCPWM** | GPIO 6      | MCPWM Capture pin ZCD(OPEN COL) |
+| **SSR**       | GPIO 7      | GPIO pin SSR(HIGH LEVEL LOGIC)  |
 
-Descripción
-
-MOSI (SPI)
-
-GPIO 11
-
-Bus compartido (ENC28J60 / MAX31865)
-
-MISO (SPI)
-
-GPIO 13
-
-Bus compartido
-
-SCK (SPI)
-
-GPIO 12
-
-Bus compartido
-
-CS (Ethernet)
-
-GPIO 10
-
-Chip Select ENC28J60
-
-INT (Ethernet)
-
-GPIO 46
-
-Interrupción ENC28J60
-
-RST (Ethernet)
-
-GPIO 9
-
-Reset manual Hardware
-
-CS (MAX31865)  CS (MAX6675)
-
-GPIO 5  GPIO4
-
-Chip Select Sensor RTD  Chip Select Sensor Termocupla K
 
 💻 Monitoreo Local
 
 El dispositivo entrega un log estructurado por el puerto serial para depuración y graficación local:
-FORMATO: DATA:<RTD>,<TC>,<SP>,<PWR>
+FORMATO: DATA:<RTD>,<TC>,<SP>,<PWR>,<WIFI_CHAR>,<ETH_CHAR>
 
 Ejemplo: DATA:25.23,26.75,100.0,100,C,C
 
+🧠 Estrategia de Control: PID en Cascada
+
+Para este sistema se ha implementado un control de Lazo Cerrado en Cascada, lo cual permite una estabilidad superior frente a las inercias térmicas del agua.
+
+🏗️ Estructura Jerárquica
+
+A diferencia de un PID simple, aquí dividimos la tarea en dos niveles de responsabilidad:
+
+1. Lazo Maestro (Externo - Variable de Proceso)
+
+Sensor: PT100 (RTD).
+
+Objetivo: Mantener la temperatura del agua en el valor de consigna (Setpoint).
+
+Acción: Compara la temperatura real del agua contra el Setpoint del usuario. Su salida no es directamente potencia PWM, sino que le indica al lazo esclavo a qué temperatura debe estar el elemento calefactor.
+
+2. Lazo Esclavo (Interno - Lazo de Seguimiento)
+
+Sensor: Termocupla Tipo K.
+
+Objetivo: Controlar la temperatura del calefactor/resistencia.
+
+Acción: Recibe el "Setpoint" desde el lazo maestro. Ajusta la cantidad de ciclos de AC para alcanzar esa temperatura rápidamente, compensando perturbaciones antes de que lleguen a afectar la temperatura del agua.
+
+📈 Flujo de la Señal
+
+    SP[Setpoint Usuario] --> Maestro[PID Maestro: Agua - RTD]
+    Maestro -- "Setpoint Secundario" --> Esclavo[PID Esclavo: Calefactor - TC K]
+    Esclavo --> PWM[Salida PWM / Disparo Triac]
+    PWM --> Proceso((Calentamiento))
+    Proceso -- Realimentación Rápida --> Esclavo
+    Proceso -- Realimentación Lenta --> Maestro
+
+
+✅ Ventajas de esta configuración
+
+Eliminación de Retardos: El lazo esclavo corrige variaciones en el calefactor antes de que la masa de agua se entere.
+
+Seguridad: El lazo esclavo puede limitar la temperatura máxima de la resistencia, protegiendo el hardware.
+
+Estabilidad: Se reduce drásticamente el overshoot (sobrepico) al calentar el agua desde frío.
 
 🛠️ Configuración y Dependencias
 

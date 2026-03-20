@@ -176,12 +176,17 @@ void vTaskMqttAdafruit(void *pvParameters) {
     for (;;) {
         // 3. Esperar datos de la cola de sensores (timeout 1 seg para poder ver log de estado en consola)
         if (xQueueReceive(telemetry_queue, &rx_data, pdMS_TO_TICKS(1000)) == pdPASS) {
- 
+ 			
+ 			// Obtenemos el estado de las redes para el log
+            EventBits_t net_status = xEventGroupGetBits(network_manager_get_event_group());
+            char wifi_char = (net_status & WIFI_CONNECTED_BIT) ? 'C' : 'D';
+            char eth_char = (net_status & ETH_CONNECTED_BIT) ? 'C' : 'O';
+
             // Imprimimos siempre en consola para monitoreo local (Cada 1s si hay dato)
             // Esto permite que un script de Python o el IDE grafiquen con baja latencia.
-            printf("DATA:%.2f,%.2f,%.1f,%d\n", 
+            printf("DATA:%.2f,%.2f,%.1f,%d,%c,%c\n", 
                    rx_data.log_data.temp_rtd, rx_data.log_data.temp_tc,
-                   rx_data.log_setpoint, rx_data.log_power);
+                   rx_data.log_setpoint, rx_data.log_power, wifi_char,eth_char);
        		 /*
         		printf("DATA:%.2f,%.2f,%.1f,%d,%c,%c\n",
               	 rx_data.log_data.temp_rtd,

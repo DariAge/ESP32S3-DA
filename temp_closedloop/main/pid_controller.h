@@ -14,6 +14,11 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_log.h"
+
+#define PID_INTEGRAL_BAND 5.0f   // Solo integra si el error es < 5 grados
+#define DERIVATIVE_FILTER 0.7f   // Filtro para el término derivativo (0.0 a 1.0)
+
+
 /**
  * @brief Estructura para el control PID de temperatura
  */
@@ -24,6 +29,7 @@ typedef struct {
     float setpoint;         // Temperatura objetivo
     float integral;         // Acumulador integral (con anti-windup)
     float last_measured;    // ÚLTIMA MEDIDA para cálculo de derivada (reemplaza last_error)
+    float last_d_term;
     float output_limit_min; // Límite mínimo de salida (0)
     float output_limit_max; // Límite máximo (BURST_WINDOW)
     float ts;               // Tiempo de muestreo en segundos (1.0 para 1Hz)

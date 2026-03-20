@@ -18,6 +18,7 @@ void pid_init(pid_ctrl_t *pid, float kp, float ki, float kd, float ts, float min
     pid->output_limit_max = max;
     pid->integral = 0;
     pid->last_measured = 0; // Usamos la medida anterior en lugar del error
+    pid->last_d_term = 0; // Para el filtro derivativo
     pid->setpoint = 0;
 }
 
@@ -29,17 +30,28 @@ float pid_compute(pid_ctrl_t *pid, float measured_value) {
     // 1. Proporcional
     float p_term = pid->kp * error;
     
-    // 2. Integral con integración rectangular
-    pid->integral += (pid->ki * error * pid->ts);
+    // 2. INTEGRAL CON ZONA MUERTA (Anti-Overshoot)
+    // Solo permitimos que la integral actúe cuando el error es pequeño.
+    // Esto evita que "cargue" potencia innecesaria durante la subida inicial.
+    if (fabsf(error) < 30){
+		pid->integral += (pid->ki * error * pid->ts);
+		// ---Anti-Windup (Clamping) ---
+    	// Si la integral sola ya supera los límites, la frenamos
+    	if (pid->integral > pid->output_limit_max) pid->integral = pid->output_limit_max;
+    	if (pid->integral < pid->output_limit_min) pid->integral = pid->output_limit_min;
+	} else {
+        // Fuera de la banda, la integral se va "vaciando" lentamente para evitar saltos
+        //pid->integral *= 0.95f; 
+    }
     
-    // --- MEJORA: Anti-Windup (Clamping) ---
-    // Si la integral sola ya supera los límites, la frenamos
-    if (pid->integral > pid->output_limit_max) pid->integral = pid->output_limit_max;
-    if (pid->integral < pid->output_limit_min) pid->integral = pid->output_limit_min;
-    
-    // 3. Derivada sobre la medida (evita "kick" al cambiar setpoint)
-    // d/dt = (medida_actual - medida_previa) / ts
-    float d_term = -pid->kd * (measured_value - pid->last_measured) / pid->ts;
+    // 3. DERIVADA CON FILTRO PASA-BAJOS
+    // Para evitar el "Derivative Kick" cuando cambia el setpoint.
+    // d/dt de la medida tiene signo opuesto al d/dt del error.
+    // d_term = -Kd * (delta_medida / dt)
+    float delta_medida = (measured_value - pid->last_measured);
+    float d_raw = -pid->kd * (delta_medida) / pid->ts;
+    float d_term = (DERIVATIVE_FILTER * pid->last_d_term) + ((1.0f - DERIVATIVE_FILTER) * d_raw);
+    pid->last_d_term = d_term;
     
     float output = p_term + pid->integral + d_term;
     
@@ -59,7 +71,7 @@ float pid_compute(pid_ctrl_t *pid, float measured_value) {
 
 bool pid_atune_start(pid_atune_t *atune, pid_ctrl_t *pid, float current_temp) {
     // Validación 1: Setpoint mínimo para que haya oscilación térmica útil
-    if (pid->setpoint < 50.0f) {
+    if (pid->setpoint < 30.0f) {
         ESP_LOGW(TAG, "Autotune abortado: Setpoint (%.1f) demasiado bajo.", pid->setpoint);
         return false;
     }
@@ -72,7 +84,7 @@ bool pid_atune_start(pid_atune_t *atune, pid_ctrl_t *pid, float current_temp) {
 
     // Inicialización de la estructura de estado
     atune->running = true;
-    atune->noise_band = 0.5f; // Histéresis de 0.5 grados
+    atune->noise_band = 0.2f; // Histéresis de 0.5 grados
     atune->peak_count = 0;
     atune->last_peak_time = 0;
     atune->sum_periods = 0;
@@ -121,9 +133,10 @@ float pid_atune_execute(pid_atune_t *atune, pid_ctrl_t *pid, float measured_valu
                 float Ku = (4.0 * pid->output_limit_max) / (3.14159 * A);
                 
                 // Fórmulas clásicas de Ziegler-Nichols para PID
-                pid->kp = 0.60 * Ku;
+                pid->kp = 0.45 * Ku;	//empece con 0,6
                 pid->ki = 1.20 * Ku / Tu;
-                pid->kd = 0.075 * Ku * Tu;
+                pid->kd = pid->kp * Tu / 8.0;
+                //pid->kd = 0.075 * Ku * Tu;
                 
                 atune->running = false; // Fin del proceso
             }

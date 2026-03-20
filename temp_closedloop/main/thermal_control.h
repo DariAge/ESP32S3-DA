@@ -18,11 +18,18 @@
 #define GPIO_TRIAC_OUT    GPIO_NUM_7
 #define BURST_WINDOW      100    // 100 semiciclos = 1 segundo a 50Hz
 
+#define MAX_TEMP_GRADIENT 		70
+#define PLATE_ABS_MAX_TEMP 		230
+#define OUTPUT_LIM_MIN_MASTER  	15		//LA SALIDA DEL PID MAESTRO ES EN TEMPERATURA
+#define OUTPUT_LIM_MIN_SLAVE	0		//LA SALIDA DEL PID ESCLAVO ES EN PORCENTAJE DE POWER	
+
 /**
  * @brief Estructura de control térmico
  */
 typedef struct {
     pid_ctrl_t pid;				//estructura para realizar control pid
+    pid_ctrl_t pid_master;
+    pid_ctrl_t pid_slave;
     pid_atune_t atune;          // Estado del Auto-Tune
     thermal_config_t *sensors;
     thermal_data_packet_t data;	//temperaturas medidas de rtd y tc

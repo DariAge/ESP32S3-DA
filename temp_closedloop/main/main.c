@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_log.h"
+#include "mcpwm_da2.h"
 #include "mqtt_client.h"
 
 #include "wifi_da.h"
@@ -42,8 +43,10 @@ void app_main(void) {
 	thermal_control_init(&sensors);
     
     //INGRESO DE DATO: POR AHORA HARCODEADo, A FUTURO INGRESADO POR USUARIO
-    thermal_set_target(100.0f); // El sistema intentará llegar a 100°C al arrancar
-
+    thermal_set_target(45.0f); // El sistema intentará llegar a 100°C al arrancar
+	
+	init_mcpwm();
+	
     // 5. Lanzar Tareas de Hardware en Core 1
 	xTaskCreatePinnedToCore(vTaskTemperatureControl, "TempCtrl", 4096, NULL, 10, NULL, 1);
 

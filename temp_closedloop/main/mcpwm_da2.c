@@ -11,6 +11,7 @@
 #include "thermal_control.h"
 #include "driver/mcpwm_prelude.h"
 #include "esp_log.h"
+#include "inttypes.h"
 
 static mcpwm_cmpr_handle_t comparator = NULL;
 static uint32_t duty_ciclos_limit = 0; // Cuántos semiciclos debe estar ON
@@ -18,10 +19,11 @@ static mcpwm_cmpr_handle_t motor_comparator = NULL;
 
 static const char *TAG = "MCPWM_DRIVER";
 
+extern thermal_system_t ts_ctx;
 // Inicializacion de módulo para todas sus funciones
 void init_mcpwm(void){
 	ESP_LOGI(TAG, "Iniciando Motor (PWM) y SSR (Control por Ciclos)");
-	
+/*	
 	mcpwm_gen_handle_t gen_r = NULL;
 	mcpwm_gen_handle_t gen_l = NULL;
     // 1. MOTOR DC - PWM 20kHz (Igual que antes)
@@ -61,12 +63,13 @@ void init_mcpwm(void){
 
     mcpwm_timer_enable(motor_timer);
     mcpwm_timer_start_stop(motor_timer, MCPWM_TIMER_START_NO_STOP);
-    
-    mcpwm_comparator_set_compare_value(comparator, 0);
+*/    
+    //mcpwm_comparator_set_compare_value(comparator, 0);
 
     // 2. CAPTURE - Sincronismo de Red
     mcpwm_cap_timer_handle_t cap_timer = NULL;
-    mcpwm_capture_timer_config_t cap_timer_conf = { .group_id = 0 };
+    mcpwm_capture_timer_config_t cap_timer_conf = { .group_id = 0,
+    												.clk_src = MCPWM_CAPTURE_CLK_SRC_DEFAULT, };
     mcpwm_new_capture_timer(&cap_timer_conf, &cap_timer);
 
     mcpwm_cap_channel_handle_t cap_chan = NULL;
@@ -74,7 +77,17 @@ void init_mcpwm(void){
         .gpio_num = ZERO_CROSS_GPIO,
         .prescale = 1,
         .flags.pos_edge = true, // Detecta cada ciclo (o semiciclo según circuito)
+    	.flags.pull_up = true, // ZCD suele ser open collector
     };
+ /*   
+    gpio_config_t io_conf = {
+    	.intr_type = GPIO_INTR_DISABLE,
+    	.mode = GPIO_MODE_INPUT,
+    	.pin_bit_mask = (1ULL << ZERO_CROSS_GPIO),
+    	.pull_up_en = 1, //importante ya que ZCD es open collector
+	};
+	gpio_config(&io_conf);
+*/	
     mcpwm_new_capture_channel(cap_timer, &cap_chan_conf, &cap_chan);
 
     mcpwm_capture_event_callbacks_t cbs = { .on_cap = on_zcd_event };
@@ -83,6 +96,7 @@ void init_mcpwm(void){
     mcpwm_capture_channel_enable(cap_chan);
     mcpwm_capture_timer_enable(cap_timer);
     mcpwm_capture_timer_start(cap_timer);
+    ESP_LOGI(TAG, "ZCD Inicializado correctamente");
 }
 
 // Control Motor
@@ -102,7 +116,9 @@ void mcpwm_set_ssr_power(float percentage) {
     if (percentage < 0.0f) percentage = 0.0f;
 
     // Convertimos el porcentaje a cantidad de semiciclos activos dentro de la ventana
-    duty_ciclos_limit = (uint32_t)((percentage / 100.0f) * VENTANA_CONTROL_CICLOS);
+    //duty_ciclos_limit = (uint32_t)((percentage / 100.0f) * VENTANA_CONTROL_CICLOS);
+    ts_ctx.pulse_target = (uint32_t)((percentage / 100.0f) * BURST_WINDOW);
     
-    ESP_LOGD(TAG, "SSR Power: %.1f%% (%" PRIu32 "/%" PRIu32 " ciclos)", percentage, duty_ciclos_limit, (uint32_t)VENTANA_CONTROL_CICLOS);
+    
+    ESP_LOGI(TAG, "SSR Power: %.1f%% %u / %u ciclos",(double)percentage, (unsigned int)ts_ctx.pulse_target, (unsigned int)BURST_WINDOW);
 }

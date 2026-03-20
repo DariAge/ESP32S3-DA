@@ -13,13 +13,13 @@
 #include "driver/gpio.h"
 
 // --- Configuración BTS7960 (Motor DC) ---
-#define BDC_MCPWM_GPIO_RPWM   25
-#define BDC_MCPWM_GPIO_LPWM   26
+#define BDC_MCPWM_GPIO_RPWM   40
+#define BDC_MCPWM_GPIO_LPWM   -1
 #define MAX_MOTOR_RPM         1250
 
 // --- Configuración SSR (Temperatura) ---
-#define SSR_PWM_GPIO          14  // GPIO para el pulso del SSR
-#define ZERO_CROSS_GPIO       34  // Entrada del detector de cruce por cero
+//#define SSR_PWM_GPIO          14  // GPIO para el pulso del SSR
+#define ZERO_CROSS_GPIO       6  // Entrada del detector de cruce por cero
 #define AC_FREQ_HZ            50  // Frecuencia de red 
 
 // Configuración de la ventana de control
