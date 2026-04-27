@@ -12,7 +12,7 @@ Compatibilidad: Adaptado específicamente para evitar conflictos de drivers en E
 🔌 Conexiones (ESP32-S3)
 
 | **SDA_INA219** 	   | GPIO 41      | SDA I2C0  |
-| **SCL_INA219**       | GPIO 42      | SCL I2C0  |
+| **SCL_INA219**     | GPIO 42      | SCL I2C0  |
 
 Nota: el módulo viene con pull-ups externas y el programa por default,
 viene con pull-up interna deshabilitadas (i2c_setup_port en i2cdev.c)
@@ -22,8 +22,6 @@ Este tester depende de la librería esp-idf-lib (UncleRus).
 Para que el compilador encuentre los componentes, el archivo CMakeLists.txt en la raíz del proyecto 
 debe modificarse INCLUDE_DIRS y PRIV_REQUIRES, como se muestra a continuación:
 
- See the build system documentation in IDF programming guide
-# for more information about component CMakeLists.txt files.
 
 idf_component_register(
     SRCS main.c         # list the source files of this component
